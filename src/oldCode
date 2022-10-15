@@ -1,0 +1,674 @@
+<template>
+  <div style="background-color: black; min-height: 100vh;">
+    <div :class="isAndroid ? 'justify-content-start pl-2' : 'justify-content-center'" class="d-flex pt-6" style="width: 100px; position: absolute;">
+      <b-img v-if="displayedScreen !== 'categories'" style="width: 30px; height: 30px; cursor: pointer;" @click="goBack()" src="@/static/Back.svg" />
+      <b-img v-if="displayedScreen !== 'categories' && !isAndroid" :class="LastRoute ? '':'forward_lowOpacity'" class="ml-1" style="width: 30px; height: 30px; cursor: pointer;" @click="goForward()" src="@/static/Forward.svg" />
+    </div>
+    <div v-if="!spinner" class="d-flex justify-content-between align-items-center flex-wrap" id="colorThief" style="overflow: hidden; z-index: 2;">
+      <div style="width: 70%;" class="d-flex align-items-center justify-content-start mt-4 ml-3">
+        <b-img @click="BackToHome()" style="transform: rotate(-5deg); width: 30px; cursor: pointer;" src="https://www.freepnglogos.com/uploads/spotify-logo-png/spotify-icon-green-logo-8.png" />
+        <p class="font text-white mb pl-2" style="cursor: pointer;">
+          Spotify
+        </p>
+        <div style="width: 200px;">
+          <p class="text-white mb pl-5 font" style="cursor: pointer;" @click="newRelease()">New releases</p>
+        </div>
+      </div>
+      <div v-if="!isAndroid" class="form-inline my-2 mr-4 mt-4 my-lg-0">
+        <input class="form-control mr-sm-2" type="search" v-model="input" placeholder="Search" aria-label="Search">
+        <button class="btn btn-outline-success my-2 my-sm-0" @click="search()">Search</button>
+      </div>
+      <div v-if="displayedScreen === 'playlist'" id="topCard" :class="{'d-flex justify-content-center': isAndroid, 'ml-5': !isAndroid}" class="mt-4" style="height: 40vh; width: 100vw;">
+        <b-img ref="myImg" id="myImg2" :src="genere[genereId].images[0].url" style="width: 300px; height: 300px;" class="p-4" />
+      </div>
+      <div v-if="displayedScreen === 'newReleasePlaylist'" :class="{'d-flex justify-content-center': isAndroid, 'ml-5': !isandroid}" class="mt-4" id="topCard" style="height: 40vh; width: 100vw;">
+        <b-img ref="myImg" id="myImg2" :src="NewRelease[NewReleaseId].images[0].url" style="width: 300px; height: 300px;" class="p-4" />
+      </div>
+    </div>
+    <div v-if="spinner" class=" d-flex justify-content-center align-items-center" style="height: 100vh; width: 100vw;">
+      <div class="spinner-border" style="color: white; width: 3rem; height: 3rem;" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
+    <div v-if="displayedScreen === 'categories'" class="d-flex justify-content-center flex-wrap" style="cursor: pointer; width: 98vw; overflow-x: hidden;">
+      <div v-for="(catagory, idx) in categories" :key="idx" @click="selectCat(idx)">
+        <p style="position: absolute;" class="p-5 font category_text">
+          {{ catagory.name }}
+        </p>
+        <b-img :src="catagory.icons[0].url" class="p-4 category_cards" />
+      </div>
+    </div>
+    <div v-if="displayedScreen === 'NewRelease'" class="d-flex justify-content-center flex-wrap" style="width: 98vw; overflow-x: hidden;">
+      <div v-for="(catagory, idx) in NewRelease" :key="idx" @click="selectNewRelease(idx)">
+        <b-img :src="catagory.images[1].url" style="cursor: pointer;" class="p-4 category_cards" />
+      </div>
+    </div>
+    <div v-if="displayedScreen === 'genere'" class="d-flex justify-content-center flex-wrap" style="width: 98vw; overflow-x: hidden;">
+      <div v-for="(catagory, idx) in genere" :key="idx" @click="selectGenere(idx)" style="cursor: pointer;" class="p-2 m-3 genere_card" @mouseover="hoverEffect(idx)" @mouseout="endHover(idx)" >
+        <b-img v-if="playBtnRender.includes(idx)" src="@/static/Play Green.svg" :class="isAndroid? 'mobilePlayBtn':'pcPlayBtn'" style="width: 60px; position: absolute;" />
+        <b-img :src="catagory.images[0].url" :class="isAndroid ? 'mobileImage' : 'pcImage'" class="p-2" />
+        <div :class="isAndroid ? 'description_mobile' : 'description_pc'">
+          <p class="font text-white pl-2" :class="{'smallFont2': isAndroid}">{{ catagory.name }}</p>
+        </div>
+        <div :class="isAndroid ? 'description_mobile' : 'description_pc'">
+          <p class="font text-white pl-2" :class="{'smallFont': isAndroid}">{{ catagory.newDescription }}</p>
+        </div>
+      </div>
+    </div>
+    <div v-if="displayedScreen === 'playlist'" class="d-flex justify-content-center flex-wrap" style="width: 98vw; position: relative; overflow-x: hidden;">
+      <div style="position: relative; width: 90%;" class="mt-5">
+        <!-- <b-img :src="catagory.track.album.images[1].url" style="width: 100px; height: 100px;" class="p-4 category_cards" /> -->
+        <table class="custom-table table-hover" style="width: 100%;">
+          <thead>
+            <tr>
+              <th scope="col" class="text-white"><p class="mb pl-4"><span>#</span><span class="pl-3">TITLE</span></p></th>
+              <th scope="col" v-if="!isAndroid" class="text-white">ALBUM</th>
+              <th scope="col" v-if="!isAndroid" class="text-white">DATE ADDED</th>
+              <th scope="col" v-if="!isAndroid" class="text-white pl-5">TIME</th>
+            </tr>
+          </thead>
+          <tbody class="customTableItem" v-for="(catagory, idx) in playlist" :key="idx">
+            <tr>
+              <td class="d-flex align-items-center flex-row" scope="row" @click="playAudio(playlist, idx, 'album')">
+                <p class="font mb text-white pr-3 pl-4">
+                  {{ idx + 1 }}
+                </p>
+                <b-img :src="catagory.track.album.images[1].url" style="width: 50px; height: 50px;" class="p-1 pl-2" />
+                <div class="d-flex flex-column pl-3">
+                  <p :class="{'smallFont2': isAndroid}" class="mb font text-white">{{ catagory.track.name }}</p>
+                  <div v-if="!isAndroid" class="d-flex flex-row">
+                    <p class="mb font text-white" v-for="(artist, id) in catagory.track.artists" :key="id">
+                      <span>{{ artist.name }}</span><span v-if="id !== catagory.track.artists.length - 1">,</span><span> </span>
+                    </p>
+                  </div>
+                  <p :class="{'smallFont2': isAndroid}" v-if="isAndroid" class="mb font text-white">
+                    <span>{{ catagory.track.artists[0].name }}</span>
+                  </p>
+                </div>
+              </td>
+              <td v-if="!isAndroid"><p class="text-white mb font">{{ catagory.track.album.name }}</p></td>
+              <td v-if="!isAndroid"><p class="text-white mb font">{{ date(catagory.added_at) }}</p></td>
+              <td v-if="!isAndroid"><p class="text-white mb font pl-5">{{ duration(catagory.track.duration_ms) }}</p></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div v-if="displayedScreen === 'newReleasePlaylist'" class="d-flex justify-content-center flex-wrap" style="width: 98vw; position: relative; overflow-x: hidden;">
+      <div style="position: relative; width: 90%;" class="mt-5">
+        <table class="custom-table table-hover" style="width: 100%;">
+          <thead>
+            <tr>
+              <th scope="col" class="text-white"><p class="mb pl-4"><span>#</span><span class="pl-3">TITLE</span></p></th>
+              <th scope="col" v-if="!isAndroid" class="text-white pl-5">TIME</th>
+            </tr>
+          </thead>
+          <tbody class="customTableItem" v-for="(catagory, idx) in newReleasePlaylist.tracks.items" :key="idx">
+            <tr>
+              <td class="d-flex align-items-center flex-row" scope="row" @click="playSearchedAudio(newReleasePlaylist.tracks.items, idx, 'newRelease')">
+                <p class="mb font text-white pr-3 pl-4">
+                  {{ idx + 1 }}
+                </p>
+                <b-img :src="newReleasePlaylist.images[1].url" style="width: 50px; height: 50px;" class="p-1 pl-2" />
+                <div class="d-flex flex-column pl-3">
+                  <p v-if="isAndroid" :class="{'smallFont2': isAndroid}" class="mb font text-white">{{ catagory.name }}</p>
+                  <p v-if="!isAndroid" class="mb font text-white">{{ customName(catagory.name) }}</p>
+                  <div class="d-flex flex-row" :class="{'mt-1': isAndroid}">
+                    <div v-if="!isAndroid">
+                      <p class="mb font text-white" v-for="(artist, id) in catagory.artists" :key="id">
+                        <span>{{ artist.name }}</span><span v-if="id !== catagory.artists.length - 1">,</span><span> </span>
+                      </p>
+                    </div>
+                    <p v-if="isAndroid" class="mb font text-white">
+                      <span :class="{'smallFont2': isAndroid}">{{ catagory.artists[0].name }}</span>
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <td v-if="!isAndroid"><p class="text-white mb pl-5">{{ duration(catagory.duration_ms) }}</p></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div v-if="popup" class="d-flex justify-content-center">
+      <div style="background-color: black; position: fixed; bottom: 12vh;">
+        <p class="text-white">Song not available</p>
+      </div>
+    </div>
+    <audio id="myAudio" />
+    <div v-if="currentTrack" class="d-flex align-items-center" :class="isAndroid ? 'smPlayHieght':'lgPlayHieght'" style="width: 100vw; position: fixed; bottom: 0; background-color: rgb(31, 30, 30);">
+      <div :class="{'d-flex justify-content-between': isAndroid}">
+        <div :class="!isAndroid ? 'playFooterPc': 'plArea'" class="d-flex flex-row align-items-center">
+          <b-img v-if="SongType === 'regular'" :src="currentTrack[songId].track.album.images[1].url" style="width: 50px; height: 50px;" class="p-1 ml-4" />
+          <b-img v-if="SongType === 'search'" :src="currentTrack[songId].album.images[1].url" style="width: 50px; height: 50px;" class="p-1 ml-4" />
+          <b-img v-if="SongType === 'newRelease'" :src="newReleasePlaylist.images[1].url" style="width: 50px; height: 50px;" class="p-1 ml-4" />
+          <div class="d-flex flex-column pl-3">
+            <p v-if="SongType === 'regular'" :class="{'smallFont': isAndroid}" class="mb text-white">{{ currentTrack[songId].track.name }}</p>
+            <p v-if="SongType === 'search' || SongType === 'newRelease'" class="mb text-white">{{ currentTrack[songId].name }}</p>
+            <div v-if="SongType === 'regular'" class="d-flex flex-row">
+              <p class="mb font text-white" v-for="(artist, id) in currentTrack[songId].track.artists" :key="id">
+                <span :class="{'smallFont': isAndroid}">{{ artist.name }}</span><span v-if="id !== currentTrack[songId].track.artists.length - 1">,</span><span> </span>
+              </p>
+            </div>
+            <div v-if="SongType === 'search' || SongType === 'newRelease'" class="d-flex flex-row">
+              <p class="mb font text-white" v-for="(artist, id) in currentTrack[songId].artists" :key="id">
+                <span>{{ artist.name }}</span><span v-if="id !== currentTrack[songId].artists.length - 1">,</span><span> </span>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-center align-items-center"  :class="isAndroid ? 'smPlayArea':'lgPlayArea'" style="height: 100%;">
+          <b-img v-if="SongType === 'regular' && !isAndroid" style="width: 35px; height: 8vh; transform: rotate(180deg); z-index: 2; cursor: pointer;" @click="previouSong()" src="@/static/Next.svg" />
+          <b-img v-if="SongType === 'search' || SongType === 'newRelease'" style="width: 35px; height: 8vh; z-index: 2; transform: rotate(180deg); cursor: pointer;" @click="previouSearchedSong()" src="@/static/Next.svg" />
+          <b-img v-if="soundStatus === 'playing'" class="ml-3 mr-3" style="width: 45px; height: 8vh; z-index: 2; cursor: pointer;" @click="playAudioBtn()" src="@/static/Play.svg" />
+          <b-img v-if="soundStatus === 'paused'" class="ml-3 mr-3" style="width: 45px; height: 8vh; z-index: 2; cursor: pointer;" @click="pauseAudio()" src="@/static/Pause.svg" />
+          <b-img v-if="SongType === 'regular'" style="width: 35px; height: 8vh; cursor: pointer; z-index: 2;" @click="NextSong()"  src="@/static/Next.svg" />
+          <b-img v-if="SongType === 'search' || SongType === 'newRelease'" style="width: 35px; z-index: 2; height: 8vh; cursor: pointer;" @click="NextSearchedSong()"  src="@/static/Next.svg" />
+        </div>
+      </div>
+    </div>
+    <div v-if="displayedScreen === 'filteredsearchResult'" class="d-flex justify-content-center flex-wrap">
+      <div class="d-flex justify-content-around flex-wrap mt-3" style="height: auto; width: 90vw;">
+        <div class="d-flex justify-content-start">
+          <p class="text-white text-left pl-2" style="position: absolute;">Top result</p>
+          <div class="p-2 m-3 mt-5 search_card" @mouseover="hoverEffect(0)" @mouseout="endHover(0)" >
+            <b-img v-if="playBtnRender.includes(0)" src="@/static/Play Green.svg" :class="isAndroid? 'mobilePlayBtn':'pcsearchPlayBtn'" style="width: 60px; position: absolute;" />
+            <b-img :src="searchResults[0].album.images[1].url" :class="isAndroid ? 'pcImage' : 'mobileImage'" class="p-2" />
+            <p class="text-white pl-2 font" :class="isAndroid ? 'description_mobile' : 'description_pc'">{{ searchResults[0].name }}</p>
+            <p class="text-white pl-2 font mb" :class="isAndroid ? 'description_mobile' : 'description_pc'">{{ searchResults[0].artists[0].name }}</p>
+          </div>
+        </div>
+        <div class="d-flex justify-content-start">
+          <p class="text-white text-left pl-3" style="position: absolute;">Songs</p>
+          <table class="custom-table table-hover mt-5" style="width: 100%;">
+            <thead>
+              <tr>
+                <th scope="col" class="text-white" style="width: 55vw;"></th>
+                <!-- <th scope="col" v-if="!isAndroid" class="text-white">ALBUM</th> -->
+                <!-- <th scope="col" v-if="!isAndroid" class="text-white">DATE ADDED</th> -->
+                <th scope="col" v-if="!isAndroid" class="text-white pl-5"></th>
+              </tr>
+            </thead>
+            <tbody class="customTableItem" v-for="(catagory, idx) in filteredResult" :key="idx">
+              <tr>
+                <td class="d-flex align-items-center flex-row" scope="row" @click="playSearchedAudio(filteredResult, idx, 'search')">
+                  <b-img :src="catagory.album.images[1].url" style="width: 50px; height: 50px;" class="p-1 pl-2" />
+                  <div class="d-flex flex-column pl-3">
+                    <p class="mb text-white font">{{ catagory.name }}</p>
+                    <div class="d-flex flex-row">
+                      <p class="mb text-white font" v-for="(artist, id) in catagory.artists" :key="id">
+                        <span>{{ artist.name }}</span><span v-if="id !== catagory.artists.length - 1">,</span><span> </span>
+                      </p>
+                    </div>
+                  </div>
+                </td>
+                <!-- <td v-if="!isAndroid"><p class="text-white mb">{{ catagory.album.name }}</p></td> -->
+                <!-- <td v-if="!isAndroid"><p class="text-white mb">{{ date(catagory.added_at) }}</p></td> -->
+                <td v-if="!isAndroid"><p class="text-white mb pl-5 pr-3">{{ duration(catagory.duration_ms) }}</p></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- </div> -->
+  </div>
+</template>
+
+<script>
+export default {
+  data () {
+    return {
+      categories: [],
+      currentTrack: null,
+      token: null,
+      soundStatus: 'paused',
+      genereId: null,
+      playBtnRender: [],
+      popup: false,
+      genere: null,
+      LastRoute: null,
+      RenderId: null,
+      NewRelease: null,
+      NewReleaseId: null,
+      SongType: null,
+      AlbumList: null,
+      isAndroid: null,
+      searchResults: null,
+      songId: null,
+      spinner: true,
+      filteredResult: null,
+      playlist: null,
+      input: '',
+      newReleasePlaylist: null,
+      displayedScreen: 'categories'
+    }
+  },
+  mounted () {
+    const self = this
+    const device = navigator.userAgent.toLowerCase()
+    const isAndroid = device.includes('android')
+    let delay
+    if (isAndroid || !!navigator.platform && /iPad|iPhone|iPod/.test(navigator.platform)) {
+      self.isAndroid = true
+      delay = 800
+    } else {
+      self.isAndroid = false
+      delay = 200
+    }
+    setTimeout(() => {
+      const APIController = (function () {
+        const clientId = 'd6f431c3b2fa4a86a10afc4e079cd74d'
+        const clientSecret = '112a67adb9ed4a07ad38c7cd13783c73'
+        const _getToken = async () => {
+          const result = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              Authorization: 'Basic ' + btoa(clientId + ':' + clientSecret)
+            },
+            body: 'grant_type=client_credentials'
+          })
+          const data = await result.json()
+          return data.access_token
+        }
+        const _getGenres = async (token) => {
+          // const result = await fetch('https://api.spotify.com/v1/recommendations/available-genre-seeds', { // recommendations
+          const result = await fetch('https://api.spotify.com/v1/browse/categories?locale=sv_US', {
+          // const result = await fetch('https://api.spotify.com/v1/search?q=fear%20on%20fire&type=track', { // search box
+          // const result = await fetch('https://api.spotify.com/v1/browse/new-releases?country=IN&offset=0&limit=40', { //new releases
+            method: 'GET',
+            headers: { Authorization: 'Bearer ' + token }
+          })
+          const data = await result.json()
+          console.log(data)
+          return data.categories.items
+        }
+        return {
+          getToken () {
+            return _getToken()
+          },
+          getGenres (token) {
+            return _getGenres(token)
+          }
+        }
+      })()
+      const APPController = (function (APICtrl) {
+        const loadGenres = async () => {
+          const token = await APICtrl.getToken()
+          // eslint-disable-next-line no-unused-vars
+          const genres = await APICtrl.getGenres(token)
+          self.categories = [...genres]
+          self.token = token
+        }
+        return {
+          init () {
+            console.log('App is starting')
+            loadGenres()
+          }
+        }
+      })(APIController)
+      APPController.init()
+      self.spinner = false
+    }, delay)
+  },
+  methods: {
+    customName (arg) {
+      let result = ''
+      if (arg.length > 10) {
+        result = arg.substring(0, 10)
+        result = result + '.....'
+        debugger
+      }
+      return result
+    },
+    async selectCat (id) {
+      const genreId = this.categories[id].id
+      const result = await fetch(`https://api.spotify.com/v1/browse/categories/${genreId}/playlists?limit=20`, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + this.token }
+      })
+      const data = await result.json()
+      console.log(data.playlists.items)
+      const Dgenere = [...data.playlists.items]
+      Dgenere.map((key) => {
+        if (key.description.length>50) {
+          key.newDescription = key.description.substring(0, 50)
+        }
+      })
+      this.genere = Dgenere
+      this.displayedScreen = 'genere'
+      location.href = "#"
+      location.href = "#colorThief"
+    },
+    async selectGenere (id) {
+      const albumId = this.genere[id].id
+      const result = await fetch(`https://api.spotify.com/v1/playlists/${albumId}`, {
+        // const result = await fetch('https://api.spotify.com/v1/albums/4tk561oaKN5jhKhu8XuP1W', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + this.token }
+      })
+      this.genereId = id
+      const data = await result.json()
+      this.playlist = data.tracks.items.filter(el => el.track.preview_url !== null)
+      this.displayedScreen = 'playlist'
+      this.chngeColor(this.genere, this.genereId)
+    },
+    chngeColor (json, id) {
+      this.$nextTick(() => {
+        const colorThief = new ColorThief()
+        const img = new Image()
+        img.crossOrigin = 'Anonymous'
+        img.src = json[id].images[0].url
+        if (img.complete) {
+          const palette = colorThief.getColor(img)
+        } else {
+          img.addEventListener('load', function() {
+            const palette = colorThief.getColor(img)
+            const rgbToHex = (r, g, b) => '#' + [r, g, b].map(x => {
+              const hex = x.toString(16)
+              return hex.length === 1 ? '0' + hex : hex
+            }).join('')
+            const color = rgbToHex(palette[0], palette[1], palette[2])
+            document.querySelector('#colorThief').style.backgroundImage = 'linear-gradient(' + color + ', black)'
+          })
+        }
+      })
+      location.href = "#"
+      location.href = "#colorThief"
+    },
+    async newRelease () {
+      const result = await fetch('https://api.spotify.com/v1/browse/new-releases?country=IN&offset=0&limit=40', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + this.token }
+      })
+      const data = await result.json()
+      this.NewRelease = data.albums.items
+      this.displayedScreen = 'NewRelease'
+      console.log(data.albums.items + ' new')
+    },
+    async selectNewRelease (id) {
+      const AlbumId = this.NewRelease[id].id
+      const result = await fetch(`https://api.spotify.com/v1/albums/${AlbumId}`, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + this.token }
+      })
+      this.NewReleaseId = id
+      const data = await result.json()
+      this.newReleasePlaylist = data
+      this.displayedScreen = 'newReleasePlaylist'
+      this.chngeColor(this.NewRelease, this.NewReleaseId)
+    },
+    playAudio (json, id) {
+      if (!this.currentTrack || this.currentTrack !== json && json) {
+        this.currentTrack = json
+      }
+      this.SongType = 'regular'
+      this.songId = id
+      this.soundStatus = 'paused'
+      const x = document.getElementById("myAudio")
+      x.src = this.currentTrack[this.songId].track.preview_url
+      x.play()
+    },
+    playAudioBtn () {
+      this.soundStatus = 'paused'
+      const x = document.getElementById("myAudio")
+      x.play()
+    },
+    pauseAudio () {
+      this.soundStatus = 'playing'
+      const x = document.getElementById("myAudio")
+      x.pause()
+    },
+    NextSong () {
+      if (this.currentTrack.length > this.songId + 1) {
+        this.soundStatus = 'paused'
+        this.songId = this.songId + 1
+        const x = document.getElementById("myAudio")
+        x.src = this.currentTrack[this.songId].track.preview_url
+        x.play()
+      } else {
+        return
+      }
+    },
+    previouSong () {
+      if (this.songId !== 0) {
+        this.soundStatus = 'paused'
+        this.songId = this.songId - 1
+        const x = document.getElementById("myAudio")
+        x.src = this.currentTrack[this.songId].track.preview_url
+        x.play()
+      }
+    },
+    playSearchedAudio (json, id, type) {
+      if (json[id].preview_url == null) {
+        this.popup = true
+        setTimeout(() => {
+          this.popup = false
+        }, 2000)
+        return
+      }
+      if (!this.currentTrack || this.currentTrack !== json && json) {
+        this.currentTrack = json
+      }
+      if (type === 'search') {
+        this.SongType = 'search'
+      } else {
+        this.SongType = 'newRelease'
+      }
+      this.songId = id
+      this.soundStatus = 'paused'
+      const x = document.getElementById("myAudio")
+       x.src = this.currentTrack[this.songId].preview_url
+      x.play()
+    },
+    NextSearchedSong () {
+      if (this.currentTrack.length > this.songId + 1) {
+        this.soundStatus = 'paused'
+        this.songId = this.songId + 1
+        const x = document.getElementById("myAudio")
+        x.src = this.currentTrack[this.songId].preview_url
+        x.play()
+      } else {
+        return
+      }
+    },
+    previouSearchedSong () {
+      if (this.songId !== 0) {
+        this.soundStatus = 'paused'
+        this.songId = this.songId - 1
+        const x = document.getElementById("myAudio")
+        x.src = this.currentTrack[this.songId].preview_url
+        x.play()
+      }
+    },
+    async search () {
+      document.querySelector('#colorThief').style.backgroundImage = 'linear-gradient(black, black)'
+      const result = await fetch(`https://api.spotify.com/v1/search?q=${this.input}&type=track`, { // search box
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + this.token }
+      })
+      const data = await result.json()
+      const dataItem = data.tracks.items
+      if (dataItem.length > 0) {
+        this.displayedScreen = 'filteredsearchResult'
+        this.searchResults = data.tracks.items
+        dataItem.length = 12
+        console.log(dataItem)
+        this.filteredResult = [...dataItem]
+        this.filteredResult = this.filteredResult.filter(el => el.preview_url !== null)
+      }
+    },
+    date (utc) {
+      const month = ['Jan', 'Feb', 'March', 'April', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec']
+      let incommingMonth = utc.slice(5, 7)
+      if (incommingMonth.slice(0, 1) === '0') {
+        incommingMonth = incommingMonth.slice(1, 2)
+      }
+      return month[incommingMonth - 1] + ' ' + utc.slice(8, 10) + ', ' + utc.slice(0, 4)
+    },
+    duration (timeInMs) {
+      const renewedTime = Math.floor(timeInMs / 1000)
+      let minutes = renewedTime / 60
+      minutes = Math.floor(minutes)
+      let sec = renewedTime % 60
+      sec = sec.toString()
+      if (sec.length == 1) {
+        sec = '0' + sec
+      }
+      return minutes + ':' + sec
+    },
+    goForward () {
+      if (this.LastRoute == null) {
+        return
+      } else if (this.displayedScreen = 'genere') {
+        this.chngeColor(this.genere, this.genereId)
+        this.displayedScreen = this.LastRoute
+      }
+    },
+    BackToHome () {
+      document.querySelector('#colorThief').style.backgroundImage = 'linear-gradient(black, black)'
+      this.displayedScreen = 'categories'
+    },
+    goBack () {
+      document.querySelector('#colorThief').style.backgroundImage = 'linear-gradient(black, black)'
+      switch (this.displayedScreen) {
+        case 'genere':
+          if (this.genereId !== null) {
+            this.LastRoute = 'genere'
+          }
+          this.displayedScreen = 'categories'
+          break
+        case 'playlist':
+          this.LastRoute = 'playlist'
+          this.displayedScreen = 'genere'
+          break
+        case 'filteredsearchResult':
+          this.LastRoute = 'filteredsearchResult'
+          this.displayedScreen = 'categories'
+          break
+        case 'newReleasePlaylist':
+          this.LastRoute = 'newReleasePlaylist'
+          this.displayedScreen = 'NewRelease'
+          break
+        case 'NewRelease':
+          this.LastRoute = 'NewRelease'
+          this.displayedScreen = 'categories'
+          break
+      }
+    },
+    hoverEffect (id) {
+      if (!this.playBtnRender.includes(id)) {
+        this.playBtnRender.push(id)
+      }
+    },
+    endHover (id) {
+      this.playBtnRender = []
+    }
+  },
+  head () {
+    return {
+      script: [
+        { hid: 'stripe', src: 'https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js', defer: true }
+      ]
+    }
+  }
+}
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans&display=swap');
+.font {
+  font-family: 'Josefin Sans', sans-serif;
+}
+.playFooterPc {
+  position: absolute;
+  height: 100%;
+}
+.smallFont {
+  font-size: 10px;
+}
+.smallFont2 {
+  font-size: 12px;
+}
+.smPlayArea {
+  width: 25vw;
+}
+.plArea {
+  width: 70vw;
+}
+.lgPlayArea {
+  width: 100vw; 
+}
+.smPlayHieght {
+  height: 15vh;
+}
+.lgPlayHieght {
+  height: 10vh;
+}
+.genere_card {
+  background-color: rgb(32, 32, 32);
+}
+.search_card {
+  background-color: rgb(32, 32, 32);
+  width: 25vw;
+  height: 300px;
+}
+.custom-table {
+  background: black;
+  border: 0;
+}
+.pcPlayBtn {
+  margin-top: 200px;
+  margin-left: 210px;
+}
+.pcsearchPlayBtn {
+  padding-top: 200px;
+  margin-left: 310px;
+}
+.mobilePlayBtn {
+  margin-top: 120px;
+  margin-left: 130px;
+}
+/* .customTableItem {
+  border-radius: 10px;
+} */
+.customTableItem:hover {
+  background: rgb(31, 30, 30);
+  cursor: pointer;
+}
+.pcImage {
+  width: 300px;
+  height: 300px;
+}
+.mobileImage {
+  width: 200px;
+  height: 200px;
+}
+.mb {
+  margin-bottom: 0;
+}
+.description_mobile {
+  width: 180px;
+}
+.description_pc {
+  width: 280px;
+}
+.category_cards:hover {
+  opacity: 0.6;
+}
+.forward_lowOpacity {
+  opacity: 0.7;
+}
+.category_cards {
+  border-radius: 30px;
+}
+.category_text {
+  font-size: 1.52rem;
+  color: white;
+}
+.pt-6 {
+  padding-top: 4rem;
+}
+</style>
